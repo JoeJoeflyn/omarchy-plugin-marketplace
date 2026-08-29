@@ -684,14 +684,13 @@ async function stageSnapshotPreview(snapshot, stageDirectory) {
 }
 
 export const readmeSanitizeOptions = Object.freeze({
-  allowedTags: sanitizeHtml.defaults.allowedTags.concat(["img"]),
+  allowedTags: sanitizeHtml.defaults.allowedTags.filter((tag) => tag !== "img"),
   allowedAttributes: {
     ...sanitizeHtml.defaults.allowedAttributes,
-    img: ["src", "alt", "width", "height"],
     a: ["href", "name", "target", "rel", "title"],
   },
   allowedSchemes: ["http", "https", "mailto"],
-  allowedSchemesByTag: { img: ["http", "https"] },
+  allowedSchemesByTag: {},
   transformTags: {
     a: (_tagName, attribs) => ({
       tagName: "a",
@@ -712,17 +711,18 @@ function resolveReadmeUrl(value, baseUrl) {
 }
 
 export function renderReadmeHtml(markdown, baseUrl = "") {
-  const raw = marked.parse(String(markdown || ""), { async: false });
+  const renderer = new marked.Renderer();
+  renderer.image = ({ text }) => (text ? `<span>[Image: ${text}]</span>` : "");
+  const raw = marked.parse(String(markdown || ""), {
+    async: false,
+    renderer,
+  });
   const html = sanitizeHtml(raw, {
     ...readmeSanitizeOptions,
     transformTags: {
       a: (_tagName, attribs) => ({
         tagName: "a",
         attribs: { ...attribs, href: resolveReadmeUrl(attribs.href, baseUrl), target: "_blank", rel: "noreferrer" },
-      }),
-      img: (_tagName, attribs) => ({
-        tagName: "img",
-        attribs: { ...attribs, src: resolveReadmeUrl(attribs.src, baseUrl) },
       }),
     },
   });

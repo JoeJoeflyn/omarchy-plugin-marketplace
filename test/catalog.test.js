@@ -1295,8 +1295,8 @@ test("renderReadmeHtml strips scripts, event handlers, and javascript: URLs", ()
   assert.doesNotMatch(html, /javascript:/i);
   assert.doesNotMatch(html, /<iframe[\s>]/i);
   assert.doesNotMatch(html, /data:text\/html/i);
+  assert.doesNotMatch(html, /<img[\s>]/i);
   assert.match(html, /<h1[^>]*>Title<\/h1>/i);
-  assert.match(html, /<img[^>]*src="https:\/\/example\.com\/ok\.png"[^>]*alt="ok"/i);
   assert.match(html, /<a[^>]*href="https:\/\/example\.com"[^>]*>ok<\/a>/i);
   assert.match(html, /<pre><code[^>]*>omarchy plugin enable foo/);
   assert.match(html, /target="_blank"/);
