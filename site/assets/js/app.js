@@ -25,14 +25,14 @@ import {
   showToast,
   updateEngagementSummary,
   updatePluginHeart
-} from "./shared.js?v=20260827-01";
+} from "./shared.js?v=20260830-01";
 import {
   engagementApiBaseUrl,
   hasPluginHeart,
   loadEngagementStats,
   recordPluginCopy,
   recordPluginHeart,
-} from "./engagement.js?v=20260827-01";
+} from "./engagement.js?v=20260830-01";
 import {
   appendSearchState,
   committedTermsFromDraft,
@@ -59,7 +59,7 @@ import {
   searchTermInputValue,
   searchTermKey,
   selectSearchCompletions,
-} from "./search.js?v=20260827-01";
+} from "./search.js?v=20260830-01";
 
 const pluginsPerPage = 9;
 const hiddenCardTags = new Set([
@@ -153,6 +153,11 @@ const countLabel = document.querySelector("#plugin-count-label");
 const empty = document.querySelector("#empty-state");
 const sourcesRoot = document.querySelector("#source-filters");
 const categoriesRoot = document.querySelector("#category-filters");
+const categoryScrollPrev = document.querySelector("#category-scroll-prev");
+const categoryScrollNext = document.querySelector("#category-scroll-next");
+const categoryScrollTrack = document.querySelector("#category-scroll-track");
+const categoryScrollThumb = document.querySelector("#category-scroll-thumb");
+const categoryListWrapper = document.querySelector(".category-list-wrapper");
 const search = document.querySelector("#search-input");
 const searchTerms = document.querySelector("#search-terms");
 const searchClear = document.querySelector("#search-clear");
@@ -1090,6 +1095,43 @@ function renderSortOptions() {
   sort.value = state.sort;
 }
 
+function updateCategoryScrollButtons() {
+  if (!categoriesRoot) return;
+  const { scrollLeft, scrollWidth, clientWidth } = categoriesRoot;
+  const hasOverflow = scrollWidth > clientWidth + 2;
+  if (categoryScrollPrev && categoryScrollNext) {
+    categoryScrollPrev.hidden = !hasOverflow;
+    categoryScrollNext.hidden = !hasOverflow;
+    if (hasOverflow) {
+      categoryScrollPrev.disabled = scrollLeft <= 2;
+      categoryScrollNext.disabled = scrollLeft + clientWidth >= scrollWidth - 2;
+    }
+  }
+  if (categoryListWrapper) {
+    if (hasOverflow) {
+      categoryListWrapper.dataset.fadeLeft = String(scrollLeft > 4);
+      categoryListWrapper.dataset.fadeRight = String(scrollLeft + clientWidth < scrollWidth - 4);
+    } else {
+      categoryListWrapper.dataset.fadeLeft = "false";
+      categoryListWrapper.dataset.fadeRight = "false";
+    }
+  }
+  if (categoryScrollTrack && categoryScrollThumb) {
+    const maxScroll = scrollWidth - clientWidth;
+    if (maxScroll <= 0) {
+      categoryScrollTrack.style.display = "none";
+    } else {
+      categoryScrollTrack.style.display = "";
+      const visibleRatio = Math.min(1, Math.max(0.12, clientWidth / scrollWidth));
+      const thumbWidthPercent = visibleRatio * 100;
+      categoryScrollThumb.style.width = `${thumbWidthPercent}%`;
+      const scrollPercent = Math.max(0, Math.min(1, scrollLeft / maxScroll));
+      const maxTranslatePercent = (1 - visibleRatio) / visibleRatio * 100;
+      categoryScrollThumb.style.transform = `translateX(${scrollPercent * maxTranslatePercent}%)`;
+    }
+  }
+}
+
 function renderCategories() {
   const plugins = sourcePlugins();
   const categoryTotals = new Map();
@@ -1110,10 +1152,23 @@ function renderCategories() {
     ...tagFilters,
   ];
 
+  const previousScrollLeft = categoriesRoot.scrollLeft;
+
   categoriesRoot.innerHTML = filters.map(({ value, label, total }) => `
     <button class="category-button${state.category === value ? " active" : ""}" type="button" data-category="${escapeHtml(value)}" aria-pressed="${state.category === value}">
       <span>${escapeHtml(label)}</span><span>${total}</span>
     </button>`).join("");
+
+  if (previousScrollLeft > 0) {
+    categoriesRoot.scrollLeft = previousScrollLeft;
+  }
+
+  const activeButton = categoriesRoot.querySelector(".category-button.active");
+  if (activeButton && previousScrollLeft === 0 && state.category !== "all") {
+    activeButton.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }
+
+  updateCategoryScrollButtons();
 
   categoriesRoot.querySelectorAll("[data-category]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -1547,6 +1602,23 @@ async function init() {
     render({ historyMode: "replace", announce: true });
     if (!restoreCatalogControlFocus(controlFocus) && catalogHadFocus) focusCatalogResult();
   });
+
+  if (categoryScrollPrev && categoryScrollNext) {
+    categoryScrollPrev.addEventListener("click", () => {
+      categoriesRoot.scrollBy({ left: -220, behavior: "smooth" });
+    });
+    categoryScrollNext.addEventListener("click", () => {
+      categoriesRoot.scrollBy({ left: 220, behavior: "smooth" });
+    });
+    categoriesRoot.addEventListener("scroll", updateCategoryScrollButtons, { passive: true });
+    window.addEventListener("resize", updateCategoryScrollButtons, { passive: true });
+    categoriesRoot.addEventListener("wheel", (event) => {
+      if (event.deltaY !== 0 && !event.deltaX && categoriesRoot.scrollWidth > categoriesRoot.clientWidth) {
+        event.preventDefault();
+        categoriesRoot.scrollLeft += event.deltaY;
+      }
+    }, { passive: false });
+  }
 
   document.querySelector("#clear-filters").addEventListener("click", resetFilters);
   document.querySelector("#empty-reset").addEventListener("click", resetFilters);
